@@ -1,0 +1,25 @@
+{
+  "request_delay": 2,
+  "refresh_hours": 24,
+  "max_pages": 100,
+  "sources": [
+    {"id":"helloworld","urls":["https://www.helloworld.rs/oglasi-za-posao/novi-sad","https://www.helloworld.rs/oglasi-za-posao/"],"detail_pattern":"/posao/.+/[0-9]+$","pagination_pattern":"/oglasi-za-posao/stranica/[0-9]+","description_selector":".__mtc-description"},
+    {"id":"infostud","urls":["https://poslovi.infostud.com/oglasi-za-posao/novi-sad?dist=15&sort=online_view_date","https://poslovi.infostud.com/oglasi-za-posao/sremski-karlovci","https://poslovi.infostud.com/oglasi-za-posao/petrovaradin"],"detail_pattern":"/posao/.+/[0-9]+$","description_selector":"[id$='-content-textAd']"},
+    {"id":"jooble","urls":["https://rs.jooble.org/SearchResult?loc=8&rgns=Petrovaradin","https://rs.jooble.org/SearchResult?rgns=Novi%20Sad","https://rs.jooble.org/SearchResult?rgns=Sremski%20Karlovci"],"detail_pattern":"/(?:jdp|desc)/","note":"HTTP 403 pri proveri; potreban dozvoljen API/feed ako blokada ostane."},
+    {"id":"halo","urls":["https://www.halooglasi.com/posao/ponuda-poslova-pretraga/novi-sad","https://www.halooglasi.com/posao/ponuda-poslova-pretraga/sremski-karlovci"],"detail_pattern":"/posao/.+/[0-9]+$"},
+    {"id":"lako","urls":["https://prod.lakodoposla.net/api/postings?locations=99&page=1","https://prod.lakodoposla.net/api/postings?search=Sremski%20Karlovci&page=1","https://prod.lakodoposla.net/api/postings?search=Petrovaradin&page=1"],"detail_pattern":"/oglasi/","original_search":"https://www.lakodoposla.com/oglasi?search=&locations=99&page=1","note":"Javni API koji koristi originalna stranica; cuvaju se samo polja oglasa."},
+    {"id":"oglasi","urls":["https://www.oglasi.rs/posao/petrovaradin","https://www.oglasi.rs/posao/novi-sad","https://www.oglasi.rs/posao/sremski-karlovci"],"detail_pattern":"/oglas/[0-9-]+/","description_selector":"[itemprop='description']"},
+    {"id":"poslovi","urls":["https://www.poslovi.rs/oglasi_za_posao/novi-sad","https://www.poslovi.rs/jobs/lists"],"detail_pattern":"/job/","description_selector":"section.no-padding-top .col-lg-12 > span","location_selector":".label-margin"},
+    {"id":"nsz","urls":["https://www.nsz.gov.rs/employee/jobs/search?place=155&page=1","https://www.nsz.gov.rs/employee/jobs/search?place=167&page=1"],"detail_pattern":"/employee/jobs/preview/[0-9]+$","title_selector":"h2.content-line-title","description_selector":".job-content","employer_selector":"p.job-description","location_selector":".job-location","allow_empty":true},
+    {"id":"klikdoposla","urls":["https://www.klikdoposla.com/oglasi-za-posao/novi-sad","https://www.klikdoposla.com/oglasi-za-posao/sremski-karlovci"],"detail_pattern":"/oglasi/[0-9]+"},
+    {"id":"kariera","urls":["https://kariera.rs/poslovi/novi-sad","https://kariera.rs/poslovi/sremski-karlovci"],"detail_pattern":"/oglas/[0-9]+","employer_selector":".detail-company","location_selector":".detail-orte","note":"Oglasi koji samo upucuju na poslodavca oznaceni su kao referral;description_missing."},
+    {"id":"bulevar","urls":["https://www.bulevar-poslova.rs/poslovi-za-studente"],"detail_pattern":"/poslovi/","title_selector":"#comp-mkaxdk9b","description_selector":"#comp-mkaxetf7","location_selector":"#comp-mkaxrdc5"},
+    {"id":"mjob","urls":["https://www.mjob.rs/api/jobs?search=Novi%20Sad&limit=50&page=1&sortBy=date","https://www.mjob.rs/api/jobs?search=Petrovaradin&limit=50&page=1&sortBy=date","https://www.mjob.rs/api/jobs?search=Sremski%20Karlovci&limit=50&page=1&sortBy=date"],"detail_pattern":"/poslovi-za-studente/informacije/","allow_empty":true,"note":"Javni API koji koristi sajt; grad se preuzima iz information.workPlace.item, a ne iz adrese poslodavca."}
+  ],
+  "additional_sources_to_integrate": [
+    {"name":"Startuj Infostud","url":"https://startuj.infostud.com/","type":"prakse i prvi posao","status":"needs_current_listing_route"},
+    {"name":"Skupština Novog Sada","url":"https://skupstina.novisad.rs/konkurs/?lang=lat","type":"javni i interni konkursi","status":"needs_document_parser_and_eligibility_filter"},
+    {"name":"Gradska poreska uprava Novi Sad","url":"https://gpu.novisad.rs/lat/node/224","type":"interni konkursi","status":"needs_document_parser_and_eligibility_filter"},
+    {"name":"NSZ publikacija Poslovi","url":"https://www.nsz.gov.rs/sadrzaji/poslovi/279","type":"PDF konkursi","status":"needs_pdf_adapter"}
+  ]
+}

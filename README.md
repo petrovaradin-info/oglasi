@@ -12,10 +12,14 @@ Iz korena projekta, u PowerShell-u:
 .\venv\Scripts\python.exe main.py status
 .\venv\Scripts\python.exe main.py export
 .\venv\Scripts\python.exe main.py candidates
+.\venv\Scripts\python.exe main.py deduplicate
+.\venv\Scripts\python.exe main.py report
 .\venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
 Podaci su u `data/oglasi.sqlite3`, JSON u `data/oglasi.json`. Putanje su vezane za projekat, ne trenutni terminal. Primer filtriranja:
+
+Komanda `report` pravi samostalan pregled `data/oglasi-pregled.html`: otvori ga u pregledaču, pretražuj po naslovu/poslodavcu/izvoru i filtriraj lokaciju. Podrazumevano skriva grupe kojima su svi poznati rokovi istekli. Prikazuje jednu karticu po grupi i sve originalne linkove. Pregled je snimak baze; ponovi komandu posle novog sakupljanja.
 
 ```powershell
 .\venv\Scripts\python.exe main.py export --location Petrovaradin
@@ -36,6 +40,10 @@ Probni limit vraća status `partial` i izlazni kod 2 jer pretraga nije kompletna
 - Bulevar: adapter javnog Wix šablona. Izmena šablona zahteva ažuriranje selektora.
 - Jooble: robots.txt odbija pretragu, a direktna provera vraća 403. Za aktivno prikupljanje potreban je dozvoljeni API/feed.
 - Mjob: javni API sa paginacijom, opisom, potrebnim veštinama, satnicom, smenama i odvojenim gradom/mestom rada. Originalni link vodi na stranicu oglasa.
+- Proširenje: Joberty (javni API, sve stranice), Šljaka (HTML i paginacija), OglasZaPosao (puni oglasi i označeni izvodi sa originalnim linkom), Manpower (Novi Sad i Južnobački okrug uz konačni lokalni filter), SBU (javna AJAX paginacija i filter mesta rada), PAZ (preskače demo oglase).
+- Adorio: samo izvodi sa dozvoljene početne liste; detalji i query paginacija su zabranjeni robots pravilima. Status je `partial`, opis je označen kao nepotpun. Careerjet: detektuje verifikacionu stranicu i prijavljuje grešku; za pouzdan pristup potreban je dozvoljen API/feed.
+
+Detalji proširenja, ograničenja i predlozi poboljšanja: [docs/prosirenje.md](docs/prosirenje.md).
 
 Svi pronađeni oglasi ponovo prolaze filter stvarnog mesta rada. Naziv grada u navigaciji i adresa sedišta poslodavca iz JobPosting-a ne koriste se kao mesto rada. Kada strukturirana lokacija nedostaje, lokacija se izvodi iz naslova/opisa i označava `location_from_text`; to je manje pouzdano. Naselja grada Novog Sada (Futog, Veternik, Sremska Kamenica, itd.) mapiraju se na filter Novi Sad uz očuvanu izvornu lokaciju, prema [spisku JKP Informatika](https://www.novisadinvest.rs/cyr/broj-stanovnika-po-naseljima). Petrovaradin ostaje poseban filter. Remote oglasi bez lokalne lokacije trenutno se ne uključuju.
 
@@ -45,7 +53,7 @@ Naslov, poslodavac, opis, izvorni URL, lokacije, datum objave, rok, prvi/posledn
 
 Izvedene kategorije, veštine i tipovi rada nose `method: keyword` i `review_required: true`; mogu imati greške, naročito kod negacija. Nepoznato ostaje prazno. Novac se ne pretvara u izmišljenu mesečnu zaradu: čuvaju se izvorna vrednost, valuta/jedinica kada postoje.
 
-Isti URL se ažurira bez novog oglasa. Automatska grupa zahteva istog normalizovanog poslodavca i naslov, isti skup lokalnih lokacija, datume objave unutar 30 dana i najmanje 85% sličnosti dovoljno dugog opisa. Slični naslovi sa istim poslodavcem/lokacijom dobijaju kandidata za proveru. Oglasi bez poslodavca se ne spajaju automatski. Svaka verzija i originalni link ostaju sačuvani. Grupisanje je namerno konzervativno i neće pronaći sve duplikate, posebno oglase agencija bez identiteta krajnjeg poslodavca.
+Isti URL se ažurira bez novog oglasa. Isti potvrđeni originalni link povezuje objave; za sadržajno poklapanje traže se isti normalizovani poslodavac, naslov i skup lokalnih lokacija. Potpuno isti opis od najmanje 160 normalizovanih znakova može se spojiti i bez datuma; različiti poznati datumi udaljeni preko 30 dana ostaju odvojeni. Ako se opisi razlikuju, potrebni su datumi unutar 30 dana i najmanje 90% sličnosti. Nepotpuni izvodi ne spajaju se samo po sličnosti sadržaja. Slični naslovi i skraćeni nazivi poslodavaca idu na proveru. Oglasi bez poslodavca spajaju se samo uz potvrđen originalni link. Svaka verzija i izvorni link ostaju sačuvani. Komanda `deduplicate` poredi i ranije sačuvane oglase bez menjanja njihovih datuma preuzimanja. Grupisanje ne garantuje prepoznavanje svih duplikata, posebno kod agencija i skraćenih opisa.
 
 Istek se prikazuje samo na osnovu objavljenog roka. Nestanak iz liste ili neuspeh sajta ne briše i ne proglašava oglas isteklim. Za oglase bez roka pogledati `last_seen`.
 
@@ -58,7 +66,7 @@ Get-ScheduledTaskInfo -TaskName Petrovaradin-Oglasi-Hourly
 
 Windows Task Scheduler pokreće lokalni program svakog punog sata, svakog dana, počev od narednog sata u vremenskoj zoni računara. Nema lozinke u skripti. Trenutna postavka radi dok je korisnik prijavljen i računar uključen; posle propuštenog termina koristi `StartWhenAvailable`. Za neprekidan rad i kada je računar isključen potreban je stalno dostupan server.
 
-Preklapanje sprečavaju Task Scheduler i procesna blokada baze. Maksimalno trajanje zadatka je 55 minuta. Potpun prvi prolaz velikih izvora može zahtevati više vremena; pratiti status i limit `max_pages` (100 po izvoru). Jedan sajt ne zaustavlja obradu ostalih. Poznati oglasi se osvežavaju na 24h, a prisustvo u listi na svakom prolazu. Razmak zahteva je najmanje 2 sekunde, uz robots.txt crawl delay. Nedostupni izvori i promene parsera beleže se u bazi i dnevnom logu `logs/YYYY-MM-DD.log`. U ovoj verziji nema automatskog slanja obaveštenja.
+Preklapanje sprečavaju Task Scheduler i procesna blokada baze; ista blokada štiti i komandu `deduplicate`. Maksimalno trajanje raspoređenog zadatka je 55 minuta. Potpun prvi prolaz velikih izvora može zahtevati više vremena; pratiti status i limit `max_pages` (100 po izvoru). Četiri izvora se obrađuju paralelno (`workers`), a upisi u bazu serijalizuju. Jedan sajt ne zaustavlja obradu ostalih. Poznati oglasi se osvežavaju na 24h, a prisustvo u listi na svakom prolazu. Uspešno provereni oglasi van područja i demo oglasi takođe se keširaju na 24h; greške se ne keširaju kao uspeh. Razmak zahteva prema izvoru je najmanje 2 sekunde, uz robots.txt crawl delay. Protego pravilno tumači wildcard/query robots pravila, a preusmeravanja proveravaju i pravila odredišta. Nedostupni izvori i promene parsera beleže se u bazi i dnevnom logu `logs/YYYY-MM-DD.log`. U ovoj verziji nema automatskog slanja obaveštenja.
 
 Isključivanje rasporeda:
 

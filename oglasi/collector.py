@@ -2,6 +2,7 @@ import json
 import logging
 import time
 import re
+from threading import Event
 from protego import Protego
 from urllib.parse import urlsplit, urljoin, urlunsplit
 from collections import deque
@@ -25,10 +26,15 @@ class Client:
         self.session.mount('https://',HTTPAdapter(max_retries=Retry(total=2,backoff_factor=1,status_forcelist=[500,502,503,504],allowed_methods=['GET'],respect_retry_after_header=False)))
         self.delay=delay; self.last={}; self.robots={}
         self.sbu_state=None
+        self.stop_event=Event()
+
+    def pause(self,seconds):
+        if self.stop_event.wait(seconds):raise FetchError('Collection interrupted')
+
 
     def request(self,url,follow_redirects=True):
         host=urlsplit(url).netloc
-        time.sleep(max(0,self.delay-(time.monotonic()-self.last.get(host,0))))
+        self.pause(max(0,self.delay-(time.monotonic()-self.last.get(host,0))))
         try:
             response=self.session.get(url,timeout=(10,30),allow_redirects=follow_redirects)
             self.last[host]=time.monotonic()
@@ -74,7 +80,8 @@ class Client:
             endpoint='https://sbu-poslovi.rs/wp-admin/admin-ajax.php'
             self.check_robots(endpoint)
             host=urlsplit(endpoint).netloc
-            time.sleep(max(0,self.delay-(time.monotonic()-self.last.get(host,0))))
+            self.pause(max(0,self.delay-(time.monotonic()-self.last.get(host,0))))
+
             payload={**self.sbu_state,'job_page':urlsplit(url).fragment.split('=')[1]}
             try:
                 response=self.session.post(endpoint,data=payload,timeout=(10,30),allow_redirects=False)
@@ -90,7 +97,9 @@ class Client:
             raise FetchError('access_verification_required: Careerjet requires a permitted API/feed')
         return html
 
-def collect(store,config,only=None,max_details=None):
+def collect(store,config,only=None,max_details=None,stop_event=None):
+    stop_event=stop_event if stop_event is not None else Event()
+
     selected={only} if isinstance(only,str) else set(only or [])
     sources=[s for s in config['sources'] if not selected or s['id'] in selected]
     workers=max(1,min(int(config.get('workers',1)),8))
@@ -98,7 +107,8 @@ def collect(store,config,only=None,max_details=None):
         from .store import Store
         def worker(source):
             local=Store(store.path)
-            try:return collect(local,{**config,'workers':1,'sources':[source]},max_details=max_details)
+            try:return collect(local,{**config,'workers':1,'sources':[source]},max_details=max_details,stop_event=stop_event)
+
             finally:local.close()
         reports=[]
         with ThreadPoolExecutor(max_workers=workers) as pool:
@@ -107,12 +117,15 @@ def collect(store,config,only=None,max_details=None):
         order={s['id']:i for i,s in enumerate(sources)}
         return sorted(reports,key=lambda r:order[r['source']])
     client=Client(config.get('request_delay',2)); reports=[]
+    client.stop_event=stop_event
     for source in sources:
+        if stop_event.is_set():break
+
         started=now(); counts={'pages':0,'discovered':0,'attempted':0,'saved':0,'cached':0,'outside_area':0,'skipped':0,'excluded_cached':0,'errors':[]}
         if not source.get('enabled',True):
             store.record(source['id'],started,'pending_integration',{'reason':source.get('note','')});continue
         queue=deque(source['urls']); visited=set(); details=set(); limited=False
-        while queue and len(visited)<config.get('max_pages',100):
+        while queue and len(visited)<config.get('max_pages',100) and not stop_event.is_set():
             url=queue.popleft()
             if url in visited:continue
             visited.add(url)
@@ -123,6 +136,7 @@ def collect(store,config,only=None,max_details=None):
                 if not found and not source.get('allow_empty',False):counts['errors'].append({'url':url,'error':'No job links found: empty results or changed/dynamic page; check source'})
                 queue.extend(p for p in pages if p not in visited)
                 for link in found:
+                    if stop_event.is_set():break
                     if link in details:continue
                     details.add(link); counts['discovered']+=1
                     if source['id'] not in ('mjob','adorio') and store.fresh(link,config.get('refresh_hours',24)):
@@ -151,17 +165,19 @@ def collect(store,config,only=None,max_details=None):
                         store.exclude(source['id'],link,str(e))
                         counts['skipped']+=1
                     except (FetchError,ValueError,TypeError,KeyError,AttributeError) as e:
-                        counts['errors'].append({'url':link,'error':str(e)})
+                        if not stop_event.is_set():counts['errors'].append({'url':link,'error':str(e)})
+
                     if len(counts['errors'])>=20:limited=True;break
                     if counts['discovered']%25==0:LOG.info('%s: %s checked, %s saved, %s errors',source['id'],counts['discovered'],counts['saved'],len(counts['errors']))
                 if limited:break
             except (FetchError,ValueError,TypeError,KeyError,AttributeError) as e:
-                counts['errors'].append({'url':url,'error':str(e)})
+                if not stop_event.is_set():counts['errors'].append({'url':url,'error':str(e)})
         if queue or limited:counts['truncated']=True
         if source.get('coverage_note'):counts['coverage_note']=source['coverage_note']
         status='partial' if counts['errors'] or counts.get('truncated') else 'ok'
         if source.get('coverage_note') and status=='ok':status='partial'
         if counts['errors'] and not counts['saved'] and not counts['cached']:status='error'
+        if stop_event.is_set():status='interrupted'
         store.record(source['id'],started,status,counts)
         LOG.info('%s: %s %s',source['id'],status,counts)
         reports.append({'source':source['id'],'status':status,**counts})

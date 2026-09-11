@@ -3,6 +3,8 @@ import json
 import logging
 import os
 import sys
+import signal
+from threading import Event
 from pathlib import Path
 from .store import Store
 from .collector import collect
@@ -46,8 +48,17 @@ def main():
                 else:
                     if args.workers:config['workers']=args.workers
                     if args.refresh:config['refresh_hours']=0
-                    reports=collect(store,config,args.source,args.max_details)
+                    stop_event=Event()
+                    def interrupt(signum,frame):
+                        if not stop_event.is_set():
+                            logging.warning('Prekid zatrazen. Cekam aktivne zahteve; sacuvani oglasi ostaju u bazi.')
+                        stop_event.set()
+                    previous=signal.signal(signal.SIGINT,interrupt)
+                    try:reports=collect(store,config,args.source,args.max_details,stop_event=stop_event)
+                    finally:signal.signal(signal.SIGINT,previous)
                     print(json.dumps(reports,ensure_ascii=False,indent=2))
+                    if stop_event.is_set():raise SystemExit(130)
+
                     if any(r['status']!='ok' for r in reports):raise SystemExit(2)
         elif args.command=='report':
             from .report import render

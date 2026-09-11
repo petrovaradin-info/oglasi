@@ -29,6 +29,8 @@ Komanda `report` pravi samostalan pregled `data/oglasi-pregled.html`: otvori ga 
 
 Probni limit vraća status `partial` i izlazni kod 2 jer pretraga nije kompletna. Kod 0 znači da su aktivni izvori u tom prolazu obrađeni bez prijavljenog problema; ne predstavlja garanciju da izvor prikazuje sve postojeće oglase.
 
+Ctrl+C traži uredan prekid: radnici završavaju aktivni zahtev i čuvanje oglasa, pa prestaju da preuzimaju nove oglase i stranice. Aktivni izvori dobijaju status `interrupted`, a program izlazni kod 130. Čekanje na mrežni zahtev i njegove ograničene ponovne pokušaje može potrajati; ponovljeni Ctrl+C ne pokreće traceback. Već sačuvani podaci ostaju u bazi. Ručno `collect` radi i posle 18h; raspored 06–18h određuje termine automatskog pokretanja.
+
 ## Izvori i obuhvat
 
 `sources.json` je proširiv registar. Uključeni su svi početno zadati portali, uz NSZ, KlikDoPosla, Kariera, Bulevar i Mjob. Dodatni kandidati su Startuj, javni/interni konkursi Novog Sada i NSZ PDF publikacija. Njihovi posebni adapteri još nisu urađeni; spisak nije tvrdnja da su svi relevantni izvori na internetu obuhvaćeni.

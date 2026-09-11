@@ -4,6 +4,7 @@ from datetime import datetime
 from urllib.parse import urljoin, urlsplit, parse_qsl, urlencode, urlunsplit
 from bs4 import BeautifulSoup
 from .model import Job, canonical, locations, enrich
+from .extra_sources import extra_listing, extra_detail, extra_html_fields
 
 def text(node): return node.get_text(' ',strip=True) if node else ''
 
@@ -33,6 +34,8 @@ def schema(soup):
         except (ValueError,TypeError):continue
 
 def listing(html,url,source):
+    extra=extra_listing(html,url,source) if source.get('id') else None
+    if extra is not None:return extra
     if source.get('id')=='mjob':
         data=json.loads(html);p=urlsplit(url);params=dict(parse_qsl(p.query))
         rows=data['jobs'];pages=[]
@@ -50,14 +53,17 @@ def listing(html,url,source):
         return found,pages
     soup=BeautifulSoup(html,'html.parser'); found={}; pages=[]
     pattern=source['detail_pattern']
-    for node in soup.select('a[href], [onclick]'):
+    for node in soup.select(source.get('listing_selector','a[href], [onclick]')):
         href=node.get('href','')
         if not href:
             match=re.search(r"(?:document\.)?location\.href\s*=\s*['\"]([^'\"]+)",node.get('onclick',''))
             if match:href=match[1]
         target=urljoin(url,href)
         if urlsplit(target).netloc!=urlsplit(url).netloc:continue
-        if re.search(pattern,urlsplit(target).path):
+        if urlsplit(target).scheme not in ('http','https'):continue
+        is_detail=bool(re.search(pattern,urlsplit(target).path))
+        if source.get('detail_query_pattern') and re.search(source['detail_query_pattern'],urlsplit(target).query):is_detail=True
+        if is_detail:
             target=canonical(target)
             found[target]=text(node)
         elif (node.get('rel') and 'next' in node.get('rel')) or (text(node).isdigit() or text(node) in ['›','»','Sledeća','Sledeca','Next']):
@@ -67,10 +73,13 @@ def listing(html,url,source):
     return found,list(dict.fromkeys(pages))
 
 def detail(html,url,source):
+    extra=extra_detail(html,url,source)
+    if extra is not None:return extra
     if source['id']=='mjob':return mjob_detail(json.loads(html),url)
     if source['id']=='lako':return lako_detail(json.loads(html)['data'],url)
     soup=BeautifulSoup(html,'html.parser')
     jobdata=next((d for d in schema(soup) if d.get('@type')=='JobPosting' or isinstance(d.get('@type'),list) and 'JobPosting' in d['@type']),{})
+    extra_html_fields(soup,source,jobdata)
     for tag in soup.select('script, style, nav, footer, .hidden'):tag.decompose()
     title=text(soup.select_one(source.get('title_selector','h1'))) or jobdata.get('title','')
     if not title: raise ValueError('Missing job title; page changed or unavailable')
@@ -81,6 +90,7 @@ def detail(html,url,source):
     employer=jobdata.get('hiringOrganization') or {}
     employer=employer.get('name','') if isinstance(employer,dict) else str(employer)
     if not employer and source.get('employer_selector'):employer=text(soup.select_one(source['employer_selector']))
+    if source['id']=='sbu':employer=employer.removeprefix('Profil poslodavca:').strip()
     if source['id']=='nsz':
         labels={}
         for row in soup.select('.job-requirements .table-row'):
@@ -116,10 +126,22 @@ def detail(html,url,source):
     location_raw=', '.join(str(v) for v in location_parts if v)
     area=locations(location_raw)
     quality='structured' if jobdata else 'html'
+    if jobdata.get('description_incomplete'):quality+=';description_incomplete;referral'
     if not location_raw:
         area=locations(title+' '+description); quality+=';location_from_text'
     job=Job(source['id'],canonical(url),title,employer,description,area,location_raw,
             str(jobdata.get('datePosted') or ''),str(jobdata.get('validThrough') or ''),structured=jobdata,quality=quality)
+    if source['id']=='sbu':
+        # Some SBU ads put the agency's Belgrade office in the map metadata.
+        # A job-scoped explicit workplace, or agreeing title AND description,
+        # takes precedence while retaining the conflicting map value for review.
+        explicit=re.search(r'(?:mesto rada|lokacija(?: posla)?|📍)\s*[:\-]?\s*(Novi Sad|Petrovaradin|Sremski Karlovci)\b',description,re.I)
+        stated=locations(explicit[1]) if explicit else sorted(set(locations(title)) & set(locations(description)))
+        if stated and set(stated)!=set(job.locations):
+            job.structured['source_map_location']=location_raw
+            job.locations=stated
+            job.location_raw=', '.join(stated)
+            job.quality+=';location_from_text;location_conflict_review'
     if source['id']=='bulevar':
         job.employer='Omladinska zadruga Bulevar'
         conditions=text(soup.select_one('#comp-mkaxx06g'))

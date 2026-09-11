@@ -58,6 +58,7 @@ def main():
                     finally:signal.signal(signal.SIGINT,previous)
                     print(json.dumps(reports,ensure_ascii=False,indent=2))
                     if stop_event.is_set():raise SystemExit(130)
+
                     if any(r['status']!='ok' for r in reports):raise SystemExit(2)
         elif args.command=='report':
             from .report import render

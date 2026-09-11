@@ -31,6 +31,7 @@ class Client:
     def pause(self,seconds):
         if self.stop_event.wait(seconds):raise FetchError('Collection interrupted')
 
+
     def request(self,url,follow_redirects=True):
         host=urlsplit(url).netloc
         self.pause(max(0,self.delay-(time.monotonic()-self.last.get(host,0))))
@@ -80,6 +81,7 @@ class Client:
             self.check_robots(endpoint)
             host=urlsplit(endpoint).netloc
             self.pause(max(0,self.delay-(time.monotonic()-self.last.get(host,0))))
+
             payload={**self.sbu_state,'job_page':urlsplit(url).fragment.split('=')[1]}
             try:
                 response=self.session.post(endpoint,data=payload,timeout=(10,30),allow_redirects=False)
@@ -97,6 +99,7 @@ class Client:
 
 def collect(store,config,only=None,max_details=None,stop_event=None):
     stop_event=stop_event if stop_event is not None else Event()
+
     selected={only} if isinstance(only,str) else set(only or [])
     sources=[s for s in config['sources'] if not selected or s['id'] in selected]
     workers=max(1,min(int(config.get('workers',1)),8))
@@ -105,6 +108,7 @@ def collect(store,config,only=None,max_details=None,stop_event=None):
         def worker(source):
             local=Store(store.path)
             try:return collect(local,{**config,'workers':1,'sources':[source]},max_details=max_details,stop_event=stop_event)
+
             finally:local.close()
         reports=[]
         with ThreadPoolExecutor(max_workers=workers) as pool:
@@ -116,6 +120,7 @@ def collect(store,config,only=None,max_details=None,stop_event=None):
     client.stop_event=stop_event
     for source in sources:
         if stop_event.is_set():break
+
         started=now(); counts={'pages':0,'discovered':0,'attempted':0,'saved':0,'cached':0,'outside_area':0,'skipped':0,'excluded_cached':0,'errors':[]}
         if not source.get('enabled',True):
             store.record(source['id'],started,'pending_integration',{'reason':source.get('note','')});continue
@@ -161,6 +166,7 @@ def collect(store,config,only=None,max_details=None,stop_event=None):
                         counts['skipped']+=1
                     except (FetchError,ValueError,TypeError,KeyError,AttributeError) as e:
                         if not stop_event.is_set():counts['errors'].append({'url':link,'error':str(e)})
+
                     if len(counts['errors'])>=20:limited=True;break
                     if counts['discovered']%25==0:LOG.info('%s: %s checked, %s saved, %s errors',source['id'],counts['discovered'],counts['saved'],len(counts['errors']))
                 if limited:break

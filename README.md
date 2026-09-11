@@ -49,14 +49,16 @@ Isti URL se ažurira bez novog oglasa. Automatska grupa zahteva istog normalizov
 
 Istek se prikazuje samo na osnovu objavljenog roka. Nestanak iz liste ili neuspeh sajta ne briše i ne proglašava oglas isteklim. Za oglase bez roka pogledati `last_seen`.
 
-## Svaki pun sat
+## Svaki pun sat od 06:00 do 18:00
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-schedule.ps1
 Get-ScheduledTaskInfo -TaskName Petrovaradin-Oglasi-Hourly
 ```
 
-Windows Task Scheduler pokreće lokalni program svakog punog sata, svakog dana, počev od narednog sata u vremenskoj zoni računara. Nema lozinke u skripti. Trenutna postavka radi dok je korisnik prijavljen i računar uključen; posle propuštenog termina koristi `StartWhenAvailable`. Za neprekidan rad i kada je računar isključen potreban je stalno dostupan server.
+Windows Task Scheduler pokreće lokalni program svakog dana (uključujući vikend) u 06:00, 07:00, …, 18:00: ukupno 13 termina u vremenskoj zoni računara. Na ovom računaru zona je Beograd, uz automatsku promenu letnjeg/zimskog vremena. Instalaciona skripta ažurira postojeći zadatak istog imena. Nema lozinke u skripti. Korisnik mora biti prijavljen, a računar uključen i budan. Propušteni termini se ne nadoknađuju (`StartWhenAvailable` je isključen), pa nema naknadnog noćnog pokretanja. Poslednji prolaz počinje u 18:00 i može trajati do 18:55; raspored ograničava početke, ne prekida rad u 18:00. Za rad dok je ovaj računar isključen potreban je stalno dostupan server.
+
+Zadatak poziva `scripts/run-collector.ps1`, koji izvršava `main.py collect`, zatim `main.py export`, i upisuje izlaz u dnevni log. Ručno pokretanje nije ograničeno ovim rasporedom.
 
 Preklapanje sprečavaju Task Scheduler i procesna blokada baze. Maksimalno trajanje zadatka je 55 minuta. Potpun prvi prolaz velikih izvora može zahtevati više vremena; pratiti status i limit `max_pages` (100 po izvoru). Jedan sajt ne zaustavlja obradu ostalih. Poznati oglasi se osvežavaju na 24h, a prisustvo u listi na svakom prolazu. Razmak zahteva je najmanje 2 sekunde, uz robots.txt crawl delay. Nedostupni izvori i promene parsera beleže se u bazi i dnevnom logu `logs/YYYY-MM-DD.log`. U ovoj verziji nema automatskog slanja obaveštenja.
 
@@ -68,4 +70,6 @@ Disable-ScheduledTask -TaskName Petrovaradin-Oglasi-Hourly
 
 ## Razvoj
 
-Prva grana je `add/oglasi`. Naredne popravke redom: `fix/oglasi-001`, `fix/oglasi-002`, itd. Baza, logovi i virtuelno okruženje nisu za Git.
+Osnova za nove radne grane je `master`. Commit i push radi korisnik iz PyCharm-a. Baza, logovi i virtuelno okruženje nisu za Git.
+
+Pregled postojećih izvora i novih kandidata: [docs/izvori.md](docs/izvori.md).

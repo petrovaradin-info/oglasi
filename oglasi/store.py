@@ -7,6 +7,7 @@ from datetime import datetime
 from difflib import SequenceMatcher
 from .model import norm, now
 from .dedup import match
+from .lifecycle import deadline_state
 
 _write_lock=threading.RLock()
 
@@ -127,5 +128,5 @@ class Store:
             values=selected.get('values',selected.get('value',[]))
             if not isinstance(values,list):values=[values]
             if facet and not any(norm(value)==norm(v) for v in values):continue
-            groups.setdefault(gid,[]).append({**job,'first_seen':first,'last_seen':last,'expired':bool(job['expires'] and job['expires'][:10]<now()[:10])})
+            groups.setdefault(gid,[]).append({**job,'first_seen':first,'last_seen':last,'expired':deadline_state(job.get('expires',''))=='istekao'})
         return [{'group_id':gid,'sources':ads} for gid,ads in groups.items()]

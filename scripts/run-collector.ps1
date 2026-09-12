@@ -14,4 +14,12 @@ if ($MaxDetails -gt 0) { $collectorArguments += @('--max-details', $MaxDetails) 
 $collectorExit = $LASTEXITCODE
 & $pythonPath (Join-Path $projectRoot 'main.py') export >> $logFile 2>&1
 if ($collectorExit -eq 0) { $collectorExit = $LASTEXITCODE }
+& $pythonPath (Join-Path $projectRoot 'main.py') export --format platform-json >> $logFile 2>&1
+if ($collectorExit -eq 0) { $collectorExit = $LASTEXITCODE }
+& $pythonPath (Join-Path $projectRoot 'main.py') export --format platform-json --exclude-expired --output (Join-Path $projectRoot 'data\poslovi-vidljivi.json') >> $logFile 2>&1
+if ($collectorExit -eq 0) { $collectorExit = $LASTEXITCODE }
+& $pythonPath (Join-Path $projectRoot 'main.py') export --format platform-json --archive-only --output (Join-Path $projectRoot 'data\poslovi-arhiva.json') >> $logFile 2>&1
+if ($collectorExit -eq 0) { $collectorExit = $LASTEXITCODE }
+& $pythonPath (Join-Path $projectRoot 'main.py') report >> $logFile 2>&1
+if ($collectorExit -eq 0) { $collectorExit = $LASTEXITCODE }
 exit $collectorExit

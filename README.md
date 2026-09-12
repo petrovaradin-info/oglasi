@@ -33,6 +33,33 @@ Ctrl+C traži uredan prekid: radnici završavaju aktivni zahtev i čuvanje oglas
 
 ## Izvori i obuhvat
 
+### Osnovne informacije za platformu
+
+```powershell
+.\venv\Scripts\python.exe main.py export --format platform-json
+.\venv\Scripts\python.exe main.py export --format csv
+```
+
+Izlazi su `data/poslovi-platforma.json` i `data/poslovi-platforma.csv` (UTF-8 sa BOM, separator `;`, za Excel). Jedan zapis predstavlja jednu grupu oglasa, uz sve izvorne linkove u `izvori`. Polja su `id`, `naslov`, `kategorija` (Posao), `poslodavac`, `lokacija`, `opis` (izvod do 280 znakova), `plata`, `tip_zaposlenja`, `link`, `datum_objave`, `rok_prijave`, `status`, `slika_url`, `kontakt_ime`, `kontakt_email`, `kontakt_tel`, `izvori`. Plata se prenosi samo iz strukturiranih podataka izvora. Slika i kontakt ostaju prazni; ne preuzimaju se nagađanjem. Puni oglas se čita preko `link` na izvornom sajtu. Ovo nije konačan ugovor sa odredišnom platformom — Paja treba da potvrdi nazive polja za uvoz.
+
+Podrazumevano se izvoze svi sakupljeni zapisi, uključujući istekle. Dodaj `--exclude-expired` da izostaviš grupe čiji su svi poznati rokovi istekli; nepoznat rok nije potvrda aktivnog oglasa. Filter `--location "Novi Sad"` i `--output PUTANJA` rade i za ove formate. Postojeća komanda `export` i dalje pravi puni JSON `data/oglasi.json`. CSV neutralizuje početne oznake formula iz teksta oglasa; JSON čuva originalni tekst.
+
+### Rokovi, arhiva i izbor izvora
+
+`tip_zaposlenja` se dopunjava iz svih izvora grupe. `tip_zaposlenja_poreklo` razlikuje objavljen podatak (`izvor`) od ključnih reči prepoznatih u tekstu (`prepoznato_u_tekstu`). Različite objavljene vrednosti se čuvaju, ne bira se proizvoljno jedna. Datum objave može se dopuniti iz drugog izvora; datum prikupljanja ne predstavlja se kao datum objave.
+
+Izvoz ima `vidljiv` i `arhiviran`, uz `status`. Istek se računa svaki put iz roka, bez brisanja baze. Rok bez sata važi do kraja navedenog dana u lokalnoj zoni računara (ovde Europe/Belgrade); rok sa vremenskom zonom poštuje tu zonu. Neispravan ili nepoznat rok ostaje nepoznat. Ako postoje samo istekli poznati rokovi, grupa ide u arhivu čak i kad drugi izvor ne navodi rok. Ako postoji neistekao rok, grupa ostaje vidljiva do najkasnijeg poznatog roka. Grupa bez ijednog poznatog roka ostaje vidljiva uz oznaku da rok nije poznat.
+
+Svaki element `izvori` sadrži `naziv`, `link`, `originalni_link`, `datum_objave`, `rok_prijave` i sopstveni `status`. Platforma može prikazati listu dugmadi „Čitaj na Infostudu / Čitaj na drugom izvoru“. Lokalni HTML pregled već prikazuje sve te linkove, tip zaposlenja, datum i rok, uz izbor Vidljivi / Arhiva / Svi. Dok je pregled otvoren, proverava istek svakog minuta.
+
+```powershell
+.\venv\Scripts\python.exe main.py export --format platform-json --exclude-expired --output data\poslovi-vidljivi.json
+.\venv\Scripts\python.exe main.py export --format platform-json --archive-only --output data\poslovi-arhiva.json
+.\venv\Scripts\python.exe main.py report
+```
+
+Zakazani `scripts/run-collector.ps1` sada obnavlja puni izvoz, platformski izvoz, vidljive oglase, arhivu i HTML posle sakupljanja, uključujući delimično uspešan prolaz. JSON je snimak vremena izvoza: odredišna platforma treba i sama da proverava rok pri prikazu, jer se datoteka ne menja između pokretanja. Komanda `collect` sama ne pokreće izvoze; pri ručnom radu koristi gornje komande.
+
 `sources.json` je proširiv registar. Uključeni su svi početno zadati portali, uz NSZ, KlikDoPosla, Kariera, Bulevar i Mjob. Dodatni kandidati su Startuj, javni/interni konkursi Novog Sada i NSZ PDF publikacija. Njihovi posebni adapteri još nisu urađeni; spisak nije tvrdnja da su svi relevantni izvori na internetu obuhvaćeni.
 
 - HelloWorld, Infostud, Halo oglasi, Oglasi.rs, Poslovi.rs: HTML/JobPosting adapteri.

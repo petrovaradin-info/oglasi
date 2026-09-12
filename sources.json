@@ -17,11 +17,11 @@
       "id": "infostud",
       "urls": [
         "https://poslovi.infostud.com/oglasi-za-posao/novi-sad?dist=15&sort=online_view_date",
-        "https://poslovi.infostud.com/oglasi-za-posao/sremski-karlovci",
-        "https://poslovi.infostud.com/oglasi-za-posao/petrovaradin"
+        "https://poslovi.infostud.com/oglasi-za-posao/sremski-karlovci"
       ],
       "detail_pattern": "/posao/.+/[0-9]+$",
-      "description_selector": "[id$='-content-textAd']"
+      "description_selector": "[id$='-content-textAd']",
+      "note": "Novi Sad sa radijusom 15 km obuhvata Petrovaradin. Putanja /petrovaradin vraća nefiltrirane oglase iz cele zemlje i ne koristi se."
     },
     {
       "id": "jooble",
@@ -97,12 +97,12 @@
       "id": "kariera",
       "urls": [
         "https://kariera.rs/poslovi/novi-sad",
-        "https://kariera.rs/poslovi/sremski-karlovci"
+        "https://kariera.rs/?q=&grad=Sremski+Karlovci"
       ],
       "detail_pattern": "/oglas/[0-9]+",
       "employer_selector": ".detail-company",
       "location_selector": ".detail-orte",
-      "note": "Oglasi koji samo upucuju na poslodavca oznaceni su kao referral;description_missing."
+      "note": "Oglasi koji samo upucuju na poslodavca oznaceni su kao referral;description_missing. Pretraga može prikazati obližnja mesta; zadržava se filter lokacije na detalju oglasa."
     },
     {
       "id": "bulevar",
@@ -216,7 +216,7 @@
       "status": "needs_current_listing_route"
     },
     {
-      "name": "Skupština Novog Sada",
+      "name": "SkupÅ¡tina Novog Sada",
       "url": "https://skupstina.novisad.rs/konkurs/?lang=lat",
       "type": "javni i interni konkursi",
       "status": "needs_document_parser_and_eligibility_filter"

@@ -4,6 +4,34 @@ Python 3.10+ sakupljač za Petrovaradin, Novi Sad i Sremske Karlovce. SQLite ču
 
 ## Pokretanje
 
+Ovaj repozitorijum trenutno prikuplja **isključivo oglase za posao**. Kupujem/prodajem/poklanjam i nekretnine ostaju zaseban budući deo platforme koja preuzima rezultate.
+
+Za ponovnu proveru svih uključenih izvora i poznatih oglasa, redom:
+
+```powershell
+cd D:\PycharmProjects\oglasi
+.\venv\Scripts\python.exe -m pip install -r requirements.txt
+.\venv\Scripts\python.exe main.py collect --refresh --workers 1
+.\venv\Scripts\python.exe main.py status
+.\venv\Scripts\python.exe main.py deduplicate
+.\venv\Scripts\python.exe main.py export
+.\venv\Scripts\python.exe main.py report
+```
+
+`--workers 1` obilazi sajtove jedan za drugim, radi lakšeg praćenja. Za paralelan rad koristi `--workers 4`. `--refresh` ponovo proverava i keširane/isključene oglase; za redovan prolaz izostavi ga. Time se ne garantuje preuzimanje svih oglasa sa interneta: blokirani i delimični izvori ostaju vidljivi u `status`. Izlazni kod 2 označava nepotpun rezultat; sačuvani podaci su dostupni za izvoz.
+
+Svako `collect` pokretanje ispisuje URL-ove i automatski pravi zaseban UTF-8 fajl `logs/collect-DATUM-VREME-PID.log`. Tačna putanja se ispisuje na početku. Log sadrži oznaku izvora, listu i broj stranice, poziciju oglasa na stranici, HTTP/API URL i ishod (`SAVED`, `CACHED`, `EXCLUDED CACHED`, `OUTSIDE AREA`, `SKIPPED`, `ERROR`). `SAVED` uključuje osvežene zapise. `pending_pages` broji trenutno poznate stranice koje čekaju, a `limit` je zaštitni limit, ne ukupan broj stranica. HTTP telo, lozinke i podaci za prijavu ne upisuju se kao deo logovanja zahteva.
+
+Za unapred poznato ime log fajla:
+
+```powershell
+.\venv\Scripts\python.exe main.py collect --refresh --workers 1 --log-file logs\poslovi.log
+# U drugom PowerShell prozoru, iz korena projekta:
+Get-Content .\logs\poslovi.log -Tail 30 -Wait
+```
+
+Ako već postoji, zadati log se dopunjuje. Automatski logovi ostaju u ignorisanom direktorijumu `logs/`; ne ulaze u commit. `Ctrl+C` uredno završava prolaz, a log ostaje za pregled.
+
 Iz korena projekta, u PowerShell-u:
 
 ```powershell
@@ -32,6 +60,12 @@ Probni limit vraća status `partial` i izlazni kod 2 jer pretraga nije kompletna
 Ctrl+C traži uredan prekid: radnici završavaju aktivni zahtev i čuvanje oglasa, pa prestaju da preuzimaju nove oglase i stranice. Aktivni izvori dobijaju status `interrupted`, a program izlazni kod 130. Čekanje na mrežni zahtev i njegove ograničene ponovne pokušaje može potrajati; ponovljeni Ctrl+C ne pokreće traceback. Već sačuvani podaci ostaju u bazi. Ručno `collect` radi i posle 18h; raspored 06–18h određuje termine automatskog pokretanja.
 
 ## Izvori i obuhvat
+
+Infostud se zaustavlja na odeljku „Dodatna ponuda poslova“, gde sajt uklanja filter grada i proširuje paginaciju na druge lokacije. Opšti limit ostaje 100 stranica; pojedinačni izvor može ga podesiti kroz `max_pages`. Ako se limit dostigne, rezultat ostaje `partial`, sa `limit_reason` i brojem preostalih stranica; to nije potpuna pretraga. Napredak se beleži i na svakih deset stranica, čak i kada su svi oglasi već u kešu.
+
+Infostud putanja `/oglasi-za-posao/petrovaradin` vraća opštu pretragu cele zemlje i uklonjena je iz konfiguracije. Petrovaradin je obuhvaćen pretragom Novog Sada sa radijusom 15 km. Parser prijavljuje grešku ako dobije opšti naslov „Posao“ umesto lokalne pretrage.
+
+Halo prazna pretraga priznaje se samo uz eksplicitnu poruku sajta. LakoDoPosla detalji sa HTTP 404/410 preskaču se i keširaju 24 sata kao nedostupni; serverske i mrežne greške ostaju greške. Nestanak detalja ne briše istorijski oglas. Kariera koristi javni formular za Sremske Karlovce, koji može ponuditi obližnja mesta; konačni filter i dalje čita lokaciju oglasa.
 
 `sources.json` je proširiv registar. Uključeni su svi početno zadati portali, uz NSZ, KlikDoPosla, Kariera, Bulevar i Mjob. Dodatni kandidati su Startuj, javni/interni konkursi Novog Sada i NSZ PDF publikacija. Njihovi posebni adapteri još nisu urađeni; spisak nije tvrdnja da su svi relevantni izvori na internetu obuhvaćeni.
 

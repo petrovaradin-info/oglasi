@@ -8,6 +8,18 @@ from .extra_sources import extra_listing, extra_detail, extra_html_fields
 
 def text(node): return node.get_text(' ',strip=True) if node else ''
 
+def empty_listing(html,source):
+    if source['id']=='lako':
+        data=json.loads(html)
+        return data.get('data')==[] and data.get('meta',{}).get('totalItems')==0
+    if source['id']=='halo':
+        soup=BeautifulSoup(html,'html.parser')
+        return any(text(n)=='Trenutno nema rezultata za zadati pojam pretrage.' for n in soup.select('.no-res-header'))
+    if source['id']=='infostud':
+        soup=BeautifulSoup(html,'html.parser');heading=soup.select_one('h1')
+        return bool(heading and re.search(r'\(0 rezultata\)',text(heading.parent)))
+    return False
+
 def sections(node):
     if not node:return {}
     result={};current='description'
@@ -52,8 +64,19 @@ def listing(html,url,source):
             pages=[urlunsplit((p.scheme,p.netloc,p.path,urlencode(params),''))]
         return found,pages
     soup=BeautifulSoup(html,'html.parser'); found={}; pages=[]
+    if source.get('id')=='infostud' and text(soup.select_one('h1'))=='Posao':
+        raise ValueError('Infostud returned an unfiltered search; verify the location URL')
     pattern=source['detail_pattern']
-    for node in soup.select(source.get('listing_selector','a[href], [onclick]')):
+    selector=source.get('listing_selector','a[href], [onclick]')
+    if source.get('id')=='infostud':selector='h2, '+selector
+    for node in soup.select(selector):
+        # Infostud appends nationwide suggestions and expands pagination after
+        # exhausting the requested city. They are not results of this search.
+        if source.get('id')=='infostud' and node.name=='h2':
+            if text(node)=='Dodatna ponuda poslova':
+                pages=[]
+                break
+            continue
         href=node.get('href','')
         if not href:
             match=re.search(r"(?:document\.)?location\.href\s*=\s*['\"]([^'\"]+)",node.get('onclick',''))

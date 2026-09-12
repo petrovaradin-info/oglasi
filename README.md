@@ -4,6 +4,34 @@ Python 3.10+ sakupljač za Petrovaradin, Novi Sad i Sremske Karlovce. SQLite ču
 
 ## Pokretanje
 
+Ovaj repozitorijum trenutno prikuplja **isključivo oglase za posao**. Kupujem/prodajem/poklanjam i nekretnine ostaju zaseban budući deo platforme koja preuzima rezultate.
+
+Za ponovnu proveru svih uključenih izvora i poznatih oglasa, redom:
+
+```powershell
+cd D:\PycharmProjects\oglasi
+.\venv\Scripts\python.exe -m pip install -r requirements.txt
+.\venv\Scripts\python.exe main.py collect --refresh --workers 1
+.\venv\Scripts\python.exe main.py status
+.\venv\Scripts\python.exe main.py deduplicate
+.\venv\Scripts\python.exe main.py export
+.\venv\Scripts\python.exe main.py report
+```
+
+`--workers 1` obilazi sajtove jedan za drugim, radi lakšeg praćenja. Za paralelan rad koristi `--workers 4`. `--refresh` ponovo proverava i keširane/isključene oglase; za redovan prolaz izostavi ga. Time se ne garantuje preuzimanje svih oglasa sa interneta: blokirani i delimični izvori ostaju vidljivi u `status`. Izlazni kod 2 označava nepotpun rezultat; sačuvani podaci su dostupni za izvoz.
+
+Svako `collect` pokretanje ispisuje URL-ove i automatski pravi zaseban UTF-8 fajl `logs/collect-DATUM-VREME-PID.log`. Tačna putanja se ispisuje na početku. Log sadrži oznaku izvora, listu i broj stranice, poziciju oglasa na stranici, HTTP/API URL i ishod (`SAVED`, `CACHED`, `EXCLUDED CACHED`, `OUTSIDE AREA`, `SKIPPED`, `ERROR`). `SAVED` uključuje osvežene zapise. `pending_pages` broji trenutno poznate stranice koje čekaju, a `limit` je zaštitni limit, ne ukupan broj stranica. HTTP telo, lozinke i podaci za prijavu ne upisuju se kao deo logovanja zahteva.
+
+Za unapred poznato ime log fajla:
+
+```powershell
+.\venv\Scripts\python.exe main.py collect --refresh --workers 1 --log-file logs\poslovi.log
+# U drugom PowerShell prozoru, iz korena projekta:
+Get-Content .\logs\poslovi.log -Tail 30 -Wait
+```
+
+Ako već postoji, zadati log se dopunjuje. Automatski logovi ostaju u ignorisanom direktorijumu `logs/`; ne ulaze u commit. `Ctrl+C` uredno završava prolaz, a log ostaje za pregled.
+
 Iz korena projekta, u PowerShell-u:
 
 ```powershell

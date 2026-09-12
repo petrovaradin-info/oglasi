@@ -3,6 +3,8 @@ from html import escape
 import json
 from urllib.parse import urlsplit
 from .model import now
+from .lifecycle import group_state, deadline_instant, deadline_state
+from .platform_export import employment
 
 
 def link(url, label):
@@ -17,16 +19,22 @@ def render(store):
     for group in sorted(groups,key=lambda g:max(j['posted'] or j['first_seen'] for j in g['sources']),reverse=True):
         ads=group['sources']
         best=max(ads,key=lambda j:(not j['expired'],'incomplete' not in j['quality'],len(j['description'])))
-        expired=all(j['expired'] for j in ads)
+        state,deadline=group_state(ads)
+        expired=state=='istekao'
+        instant=deadline_instant(deadline)
+        expiry_ms=int(instant.timestamp()*1000) if instant else 0
+        kind,kind_origin=employment(ads)
+        posted=best['posted'] or next((j['posted'] for j in ads if j['posted']),'')
         places=', '.join(sorted({p for j in ads for p in j['locations']}))
         sources=', '.join(sorted({j['source'] for j in ads}))
-        links=' · '.join(link(j['url'],j['source'])+(' ('+link(j['structured']['original_url'],'original')+')' if j['structured'].get('original_url') and j['structured']['original_url']!=j['url'] else '') for j in ads)
+        links=' · '.join(link(j['url'],j['source'])+' ['+escape(j['expires'] or 'rok nije naveden')+('; rok prošao' if j['expired'] else '')+']'+(' ('+link(j['structured']['original_url'],'original')+')' if j['structured'].get('original_url') and j['structured']['original_url']!=j['url'] else '') for j in ads)
         warning='Izvod sa liste — opis nije kompletan.' if 'incomplete' in best['quality'] else ''
         search=escape(' '.join([best['title'],best['employer'],places,sources]).lower(),quote=True)
-        cards.append(f'''<article data-search="{search}" data-expired="{int(expired)}" data-location="{escape(places,quote=True)}">
+        cards.append(f'''<article data-search="{search}" data-expired="{int(expired)}" data-deadline="{expiry_ms}" data-location="{escape(places,quote=True)}">
 <h2>{escape(best['title'])}</h2><p><strong>{escape(best['employer'] or 'Poslodavac nije naveden')}</strong> · {escape(places)}</p>
-<p class="meta">Grupa {group['group_id']} · {len(ads)} izvornih objava · {'Istekao rok' if expired else 'Rok nije istekao ili nije poznat'} · Rok: {escape(best['expires'][:10] or 'nije naveden')}</p>
-<p>{links}</p><p class="warning">{warning}</p><details><summary>Opis i podaci</summary>
+<p>Tip zaposlenja: <strong>{escape(kind or 'nije naveden')}</strong>{' (prepoznato iz teksta)' if kind_origin=='prepoznato_u_tekstu' else ''}</p>
+<p class="meta">Grupa {group['group_id']} · {len(ads)} izvornih objava · <span class="deadline-state">{'Istekao rok — arhiva' if expired else 'Rok nije istekao ili nije poznat'}</span> · Objavljeno: {escape(posted[:10] or 'nije navedeno')} · Rok: {escape(deadline or 'nije naveden')}</p>
+<p>Izaberi gde čitaš oglas: {links}</p><p class="warning">{warning}</p><details><summary>Opis i podaci</summary>
 <pre>{escape(best['description'])}</pre><p class="meta">Prvi put viđen: {escape(best['first_seen'][:10])} · Poslednji put viđen: {escape(best['last_seen'][:10])} · Kvalitet: {escape(best['quality'])}</p></details></article>''')
     runs=[]
     for source,finished,status,raw in store.db.execute('SELECT source,finished,status,details FROM runs WHERE id IN (SELECT MAX(id) FROM runs GROUP BY source) ORDER BY source'):
@@ -53,10 +61,10 @@ body{font:16px/1.55 system-ui,sans-serif;background:#f4f6f8;color:#172c3b;max-wi
 <p class="meta">Generisano: '''+escape(now())+'''</p><details><summary>Poslednji rezultati izvora</summary><div class="scroll"><table><thead><tr><th>Izvor</th><th>Status</th><th>Vreme UTC</th><th>Sačuvano</th><th>Keš</th><th>Van područja</th><th>Preskočeno</th><th>Napomena</th></tr></thead><tbody>'''+''.join(runs)+'''</tbody></table></div></details>
 <section><label><input id="q" type="search" placeholder="Naslov, poslodavac ili izvor" aria-label="Pretraga oglasa"></label>
 <label><select id="location" aria-label="Lokacija"><option value="">Sve lokacije</option><option>Petrovaradin</option><option>Novi Sad</option><option>Sremski Karlovci</option></select></label>
-<label><input id="expired" type="checkbox"> Prikaži i istekle</label><p id="count" aria-live="polite"></p></section>
+<label><select id="view" aria-label="Vidljivost oglasa"><option value="visible">Vidljivi oglasi</option><option value="archive">Arhiva — istekao rok</option><option value="all">Svi oglasi</option></select></label><p id="count" aria-live="polite"></p></section>
 <main>'''+''.join(cards)+'''</main><details><summary>Parovi koji zahtevaju proveru</summary><p>Ovi oglasi nisu automatski spojeni jer dokaz nije dovoljno pouzdan.</p><ul>'''+''.join(pairs)+'''</ul></details>
 <script>
-const q=document.querySelector('#q'),place=document.querySelector('#location'),expired=document.querySelector('#expired');
-function filter(){let visible=0;document.querySelectorAll('article').forEach(card=>{card.hidden=(!expired.checked&&card.dataset.expired==='1')||!card.dataset.search.includes(q.value.toLowerCase().trim())||(place.value&&!card.dataset.location.includes(place.value));if(!card.hidden)visible++});document.querySelector('#count').textContent='Prikazano grupa: '+visible;}
-[q,place,expired].forEach(el=>el.addEventListener('input',filter));filter();
+const q=document.querySelector('#q'),place=document.querySelector('#location'),view=document.querySelector('#view');
+function filter(){let visible=0;document.querySelectorAll('article').forEach(card=>{const deadline=Number(card.dataset.deadline),ended=deadline>0&&deadline<=Date.now();card.dataset.expired=ended?'1':'0';card.querySelector('.deadline-state').textContent=ended?'Istekao rok — arhiva':(deadline?'Rok nije istekao':'Rok nije poznat');card.hidden=(view.value==='visible'&&ended)||(view.value==='archive'&&!ended)||!card.dataset.search.includes(q.value.toLowerCase().trim())||(place.value&&!card.dataset.location.includes(place.value));if(!card.hidden)visible++});document.querySelector('#count').textContent='Prikazano grupa: '+visible;}
+[q,place,view].forEach(el=>el.addEventListener('input',filter));filter();setInterval(filter,60000);
 </script></html>'''

@@ -19,8 +19,10 @@ def main():
     run=sub.add_parser('collect');run.add_argument('--source',action='append');run.add_argument('--max-details',type=int)
     run.add_argument('--workers',type=int,choices=range(1,9))
     run.add_argument('--refresh',action='store_true',help='Recheck known and excluded ads regardless of their cache age')
-    run.add_argument('--log-file',type=Path,help='UTF-8 log path; defaults to logs/collect-TIMESTAMP-PID.log')
-    export=sub.add_parser('export');export.add_argument('--location');export.add_argument('--facet');export.add_argument('--value');export.add_argument('--output',type=Path,default=ROOT/'data'/'oglasi.json')
+    export=sub.add_parser('export');export.add_argument('--location');export.add_argument('--facet');export.add_argument('--value');export.add_argument('--output',type=Path)
+    export.add_argument('--format',choices=['full-json','platform-json','csv'],default='full-json')
+    export.add_argument('--exclude-expired',action='store_true',help='Exclude groups with all known deadlines expired; unknown deadlines remain')
+    export.add_argument('--archive-only',action='store_true',help='Export only expired groups')
     sub.add_parser('status');sub.add_parser('sources');sub.add_parser('candidates')
     sub.add_parser('deduplicate')
     report=sub.add_parser('report');report.add_argument('--output',type=Path,default=ROOT/'data'/'oglasi-pregled.html')
@@ -76,8 +78,17 @@ def main():
             print(args.output)
         elif args.command=='export':
             if bool(args.facet)!=bool(args.value):parser.error('--facet and --value must be used together')
+            from .platform_export import cards, write_csv
+            from .lifecycle import group_state
+            if args.exclude_expired and args.archive_only:parser.error('Choose either --exclude-expired or --archive-only')
+            args.output=args.output or ROOT/'data'/({'full-json':'oglasi.json','platform-json':'poslovi-platforma.json','csv':'poslovi-platforma.csv'}[args.format])
             args.output.parent.mkdir(parents=True,exist_ok=True)
-            args.output.write_text(json.dumps(store.export(args.location,args.facet,args.value),ensure_ascii=False,indent=2),encoding='utf-8')
+            groups=store.export(args.location,args.facet,args.value)
+            if args.exclude_expired:groups=[g for g in groups if group_state(g['sources'])[0]!='istekao']
+            if args.archive_only:groups=[g for g in groups if group_state(g['sources'])[0]=='istekao']
+            rows=groups if args.format=='full-json' else cards(groups)
+            if args.format=='csv':write_csv(args.output,rows)
+            else:args.output.write_text(json.dumps(rows,ensure_ascii=False,indent=2),encoding='utf-8')
             print(args.output)
         elif args.command=='candidates':
             rows=store.db.execute('SELECT url_a,url_b,score,reason FROM candidates ORDER BY score DESC').fetchall()

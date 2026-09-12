@@ -6,6 +6,7 @@ import sys
 import signal
 from threading import Event
 from pathlib import Path
+from datetime import datetime
 from .store import Store
 from .collector import collect
 
@@ -18,6 +19,7 @@ def main():
     run=sub.add_parser('collect');run.add_argument('--source',action='append');run.add_argument('--max-details',type=int)
     run.add_argument('--workers',type=int,choices=range(1,9))
     run.add_argument('--refresh',action='store_true',help='Recheck known and excluded ads regardless of their cache age')
+    run.add_argument('--log-file',type=Path,help='UTF-8 log path; defaults to logs/collect-TIMESTAMP-PID.log')
     export=sub.add_parser('export');export.add_argument('--location');export.add_argument('--facet');export.add_argument('--value');export.add_argument('--output',type=Path,default=ROOT/'data'/'oglasi.json')
     sub.add_parser('status');sub.add_parser('sources');sub.add_parser('candidates')
     sub.add_parser('deduplicate')
@@ -27,7 +29,15 @@ def main():
     config=json.loads((ROOT/'sources.json').read_text(encoding='utf-8'))
     if args.command=='sources':print(json.dumps(config,ensure_ascii=False,indent=2));return
     store=Store(args.db)
+    file_handler=None
     try:
+        if args.command=='collect':
+            log_path=args.log_file or ROOT/'logs'/('collect-'+datetime.now().strftime('%Y%m%d-%H%M%S-%f')+'-'+str(os.getpid())+'.log')
+            log_path.parent.mkdir(parents=True,exist_ok=True)
+            file_handler=logging.FileHandler(log_path,encoding='utf-8')
+            file_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
+            logging.getLogger().addHandler(file_handler)
+            logging.info('LOG FILE: %s',log_path.resolve())
         if args.command in ('collect','deduplicate'):
             if args.command=='collect':
                 if args.source and set(args.source)-{s['id'] for s in config['sources']}:parser.error('Unknown source')
@@ -58,7 +68,6 @@ def main():
                     finally:signal.signal(signal.SIGINT,previous)
                     print(json.dumps(reports,ensure_ascii=False,indent=2))
                     if stop_event.is_set():raise SystemExit(130)
-
                     if any(r['status']!='ok' for r in reports):raise SystemExit(2)
         elif args.command=='report':
             from .report import render
@@ -76,4 +85,8 @@ def main():
         else:
             rows=store.db.execute('SELECT source,finished,status,details FROM runs WHERE id IN (SELECT MAX(id) FROM runs GROUP BY source)').fetchall()
             print(json.dumps([dict(zip(('source','finished','status','details'),r)) for r in rows],ensure_ascii=False,indent=2))
-    finally:store.close()
+    finally:
+        store.close()
+        if file_handler:
+            logging.getLogger().removeHandler(file_handler)
+            file_handler.close()

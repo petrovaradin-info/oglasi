@@ -32,10 +32,17 @@ def render(store):
     for source,finished,status,raw in store.db.execute('SELECT source,finished,status,details FROM runs WHERE id IN (SELECT MAX(id) FROM runs GROUP BY source) ORDER BY source'):
         data=json.loads(raw)
         issues='; '.join(e.get('error','') for e in data.get('errors',[])[:2]) or data.get('coverage_note','')
+        if data.get('truncated'):issues+=' Pretraga nije završena: '+str(data.get('limit_reason','limit'))
         runs.append('<tr>'+''.join('<td>'+escape(str(v))+'</td>' for v in [source,status,finished[:19],data.get('saved',0),data.get('cached',0),data.get('outside_area',0),data.get('skipped',0),issues])+'</tr>')
     pairs=[]
+    payloads={url:json.loads(raw) for url,raw in store.db.execute('SELECT url,payload FROM ads')}
     for a,b,score,reason in store.db.execute('SELECT url_a,url_b,score,reason FROM candidates ORDER BY score DESC'):
-        pairs.append('<li>'+link(a,a)+'<br>'+link(b,b)+'<br>'+escape(reason)+f' ({score:.0%})</li>')
+        comparisons=[]
+        for url in (a,b):
+            job=payloads[url]
+            comparisons.append('<p>'+link(url,job['title'])+' · '+escape(job['source'])+'<br>'+escape(job['employer'] or 'Poslodavac nije naveden')+' · '+escape(', '.join(job['locations']))+' · Objavljeno: '+escape(job['posted'] or 'nepoznato')+'</p><details><summary>Uporedi opis</summary><pre>'+escape(job['description'])+'</pre></details>')
+        label='Različiti datumi — moguć ponovljen konkurs' if reason=='similar_job_different_dates' else 'Sličan naslov i poslodavac — potreban pregled sadržaja'
+        pairs.append('<li>'+''.join(comparisons)+'<p>'+escape(label)+f' · Sličnost: {score:.0%} (nije verovatnoća duplikata)</p></li>')
     total=sum(len(g['sources']) for g in groups)
     return '''<!doctype html><html lang="sr-Latn"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Oglasi — pregled lokalne baze</title><style>

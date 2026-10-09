@@ -187,7 +187,7 @@ class ExpansionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             store=Store(Path(tmp)/'test.db')
             def job(url,description='Long enough distinctive job description. '*10,employer='Acme d.o.o.'):
-                return Job('test',url,'Python developer',employer,description,['Novi Sad'])
+                return Job(url.split('/')[2],url,'Python developer',employer,description,['Novi Sad'])
             a=job('https://a.rs/1');g=store.save(a)
             self.assertEqual(store.save(job('https://b.rs/1',employer='Acme DOO')),g)
             c=job('https://c.rs/1','Different job content. '*12);self.assertNotEqual(store.save(c),g)
@@ -213,7 +213,7 @@ class ExpansionTests(unittest.TestCase):
         from oglasi.dedup import match,title_key
         self.assertEqual(title_key('Prodavac (m/ž), Novi Sad grad'),'prodavac')
         a=Job('a','https://a.rs/1','Prodavac','Example Company','Unique description. '*20,['Novi Sad']).dict()
-        b={**a,'url':'https://b.rs/1','title':'Prodavac (m/ž), Novi Sad grad'}
+        b={**a,'source':'b','url':'https://b.rs/1','title':'Prodavac (m/ž), Novi Sad grad'}
         self.assertTrue(match(a,b)[0])
         b={**b,'employer':'Example Comp...','quality':'description_incomplete'}
         automatic,score,reason=match(a,b)

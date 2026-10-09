@@ -121,12 +121,12 @@ class Store:
 
     def export(self,location=None,facet=None,value=None):
         groups={}
-        for url,gid,raw,first,last in self.db.execute('SELECT url,group_id,payload,first_seen,last_seen FROM ads ORDER BY group_id'):
+        for url,gid,raw,first,last,fetched in self.db.execute('SELECT url,group_id,payload,first_seen,last_seen,fetched_at FROM ads ORDER BY group_id'):
             job=json.loads(raw)
             if location and location not in job['locations']:continue
             selected=job['facets'].get(facet,{})
             values=selected.get('values',selected.get('value',[]))
             if not isinstance(values,list):values=[values]
             if facet and not any(norm(value)==norm(v) for v in values):continue
-            groups.setdefault(gid,[]).append({**job,'first_seen':first,'last_seen':last,'expired':deadline_state(job.get('expires',''))=='istekao'})
+            groups.setdefault(gid,[]).append({**job,'first_seen':first,'last_seen':last,'fetched_at':fetched,'expired':deadline_state(job.get('expires',''))=='istekao'})
         return [{'group_id':gid,'sources':ads} for gid,ads in groups.items()]

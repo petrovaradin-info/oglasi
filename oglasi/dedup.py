@@ -47,6 +47,8 @@ def match(a, b):
         nearby = None
     if nearby is False:
         return False, title_score, 'similar_job_different_dates'
+    if a.get('source') == b.get('source') and (not a.get('posted') or not b.get('posted') or a['posted'][:10] != b['posted'][:10]):
+        return False, title_score, 'possible_reposted_job; needs_review'
     desc_a, desc_b = norm(a.get('description')), norm(b.get('description'))
     incomplete = any('incomplete' in j.get('quality', '') or 'missing' in j.get('quality', '') and not j.get('description') for j in (a,b))
     if title_score == 1 and not incomplete and min(len(desc_a), len(desc_b)) >= 160:

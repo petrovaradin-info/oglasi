@@ -1,17 +1,21 @@
 """Small job cards for downstream platforms; original ads retain full content."""
 import csv
 import json
+from bs4 import BeautifulSoup
 from urllib.parse import urlsplit
 from .lifecycle import deadline_state, group_state
 
 
 FIELDS=('id','naslov','kategorija','poslodavac','lokacija','opis','tip_zaposlenja','tip_zaposlenja_poreklo','plata',
-        'link','datum_objave','rok_prijave','status','vidljiv','arhiviran',
+        'poslednji_pronalazak','poslednje_uspesno_citanje','link','datum_objave','rok_prijave','status','vidljiv','arhiviran',
         'slika_url','kontakt_ime','kontakt_email','kontakt_tel','izvori')
 
 
 def web_url(value):
-    return value if isinstance(value,str) and urlsplit(value).scheme in ('http','https') and urlsplit(value).netloc else ''
+    try:
+        parts=urlsplit(value) if isinstance(value,str) else None
+        return value if parts and parts.scheme in ('http','https') and parts.hostname and not parts.username and not parts.password else ''
+    except ValueError:return ''
 
 
 def label(value):
@@ -65,7 +69,7 @@ def cards(groups,exclude_expired=False):
         best=max(ads,key=lambda a:(deadline_state(a.get('expires',''))=='rok_nije_istekao',not a['expired'],bool(a['employer']),'incomplete' not in a['quality'],len(a['description'])))
         kind,kind_origin=employment([best]+[a for a in ads if a is not best])
         data=best.get('structured') or {}
-        description=' '.join(best['description'].split())
+        description=' '.join(BeautifulSoup(best['description'],'html.parser').get_text(' ',strip=True).split())
         if len(description)>280:description=description[:277].rsplit(' ',1)[0]+'…'
         row=dict.fromkeys(FIELDS,'')
         row.update(id=str(group['group_id']),naslov=best['title'],kategorija='Posao',
@@ -74,9 +78,13 @@ def cards(groups,exclude_expired=False):
                    link=web_url(data.get('original_url')) or web_url(best['url']),
                    datum_objave=best['posted'] or next((a['posted'] for a in ads if a.get('posted')),''),rok_prijave=deadline,
                    status=status,vidljiv=not expired,arhiviran=expired,
+                   poslednji_pronalazak=max((a.get('last_seen','') for a in ads),default=''),
+                   poslednje_uspesno_citanje=max((a.get('fetched_at','') for a in ads),default=''),
                    izvori=[{'naziv':a['source'],'link':web_url(a['url']),
                             'originalni_link':web_url(a.get('structured',{}).get('original_url')),
                             'datum_objave':a.get('posted',''),'rok_prijave':a.get('expires',''),
+                            'poslednji_pronalazak':a.get('last_seen',''),
+                            'poslednje_uspesno_citanje':a.get('fetched_at',''),
                             'status':deadline_state(a.get('expires',''))} for a in ads])
         result.append(row)
     return result

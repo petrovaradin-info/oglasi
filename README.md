@@ -134,3 +134,44 @@ Disable-ScheduledTask -TaskName Petrovaradin-Oglasi-Hourly
 ## Razvoj
 
 Prva grana je `add/oglasi`. Naredne popravke redom: `fix/oglasi-001`, `fix/oglasi-002`, itd. Baza, logovi i virtuelno okruženje nisu za Git.
+
+
+## Javni izvoz za sajt (fix/oglasi-007)
+
+```powershell
+.\venv\Scripts\python.exe main.py export --format public-json
+.\venv\Scripts\python.exe main.py report
+```
+
+Za objavu koristi `data/poslovi-javni.json`. Raniji `platform-json` i
+`--exclude-expired` ostaju kompatibilni izvozi i ne primenjuju novu javnu politiku.
+Javni format je objekat sa `schema_version`, `generated_at`, `count` i listom
+`oglasi`. Pomoćni `data/poslovi-javni-provera.json` je za interni pregled:
+sadrži naslove, izvore i razloge izdvajanja. Ne objavljivati taj fajl niti SQLite.
+
+Javni izvoz isključuje istekle rokove, oglase bez poznatog roka čiji je poslednji
+pronalazak star najmanje 14 dana (ili nedostaje), i grupe u kojima nisu svi
+parovi podržani aktuelnim pravilima spajanja. To nije dokaz da su izdvojene
+grupe pogrešne: pregledati ih pre odluke. Baza i istorija se ne razdvajaju i ne brišu.
+Ponovljeni oglasi istog izvora sa različitim datumima, ili bez datuma, više se
+ne spajaju samo zbog jednakog sadržaja; eksplicitna veza na original ostaje dokaz.
+
+`poslednji_pronalazak` označava pronalazak na izvoru, a
+`poslednje_uspesno_citanje` uspešno preuzimanje sačuvanog sadržaja.
+Greška izvora ne osvežava ove datume. Datum objave se ne izmišlja.
+ID ostaje postojeći ID grupe i stabilan je pri ponovnom izvozu i osvežavanju;
+kod naknadnog spajanja grupa ostaje najmanji ID. Potrošač treba da zamenjuje
+ceo javni snimak, ne da samo dodaje nove ID-jeve. Trajni URL pojedinačnog oglasa
+ne treba vezivati za ID grupe bez zasebnog mehanizma preusmeravanja.
+
+Sajt treba da prikazuje tekst kao tekst (ne `innerHTML`), ponudi izbor izvora
+i otvori puni oglas kod oglašivača. Poštovati `vidljiv_do` i ukloniti karticu
+po isteku tog trenutka čak i ako novi snimak kasni. Nepoznat rok nije potvrda
+da konkurs traje. Datumi bez vremena koriste lokalnu vremensku zonu računara;
+računar koji izvozi treba da bude podešen na Europe/Belgrade.
+
+JSON i HTML se pišu u privremeni fajl u istom direktorijumu, pa se tek gotov
+fajl atomskom zamenom objavljuje. Raspoređena PowerShell skripta sada pravi i
+javni izvoz. Lokalni HTML ima zaseban filter „Potrebna provera“.
+
+Provera: `python -m unittest discover -s tests`.

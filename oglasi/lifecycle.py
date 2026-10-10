@@ -1,16 +1,19 @@
 """Deadline state is computed on reads; historical ads are never deleted."""
 from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
+
+JOB_TIMEZONE = ZoneInfo("Europe/Belgrade")
 
 
 def deadline_instant(value):
-    if not value:return None
+    if not isinstance(value,str) or not value:return None
     try:
         if len(value)==10:
             deadline=datetime.strptime(value,'%Y-%m-%d')+timedelta(days=1)
         else:deadline=datetime.fromisoformat(value.replace('Z','+00:00'))
-        if deadline.tzinfo is None:deadline=deadline.astimezone()
+        if deadline.tzinfo is None:deadline=deadline.replace(tzinfo=JOB_TIMEZONE)
         return deadline.astimezone(timezone.utc)
-    except (ValueError,TypeError):return None
+    except (ValueError,TypeError,OverflowError):return None
 
 
 def deadline_state(value,at=None):
@@ -21,9 +24,10 @@ def deadline_state(value,at=None):
     return 'istekao' if expired else 'rok_nije_istekao'
 
 
-def group_state(ads):
-    known=[a for a in ads if deadline_state(a.get('expires',''))!='rok_nije_poznat']
-    live=[a for a in known if deadline_state(a['expires'])=='rok_nije_istekao']
+def group_state(ads,at=None):
+    at=at or datetime.now(timezone.utc)
+    known=[a for a in ads if deadline_state(a.get('expires',''),at)!='rok_nije_poznat']
+    live=[a for a in known if deadline_state(a['expires'],at)=='rok_nije_istekao']
     # A missing deadline on a syndication does not extend an explicit deadline.
     status='rok_nije_istekao' if live else ('istekao' if known else 'rok_nije_poznat')
     dates=[a['expires'] for a in live or known]

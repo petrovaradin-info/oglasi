@@ -24,4 +24,6 @@ if ($collectorExit -eq 0) { $collectorExit = $LASTEXITCODE }
 if ($collectorExit -eq 0) { $collectorExit = $LASTEXITCODE }
 & $pythonPath (Join-Path $projectRoot 'main.py') report >> $logFile 2>&1
 if ($collectorExit -eq 0) { $collectorExit = $LASTEXITCODE }
+& $pythonPath (Join-Path $projectRoot 'main.py') review >> $logFile 2>&1
+if ($collectorExit -eq 0) { $collectorExit = $LASTEXITCODE }
 exit $collectorExit

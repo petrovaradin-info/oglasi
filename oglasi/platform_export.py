@@ -59,14 +59,14 @@ def employment(ads):
     return ', '.join(dict.fromkeys(values)),('prepoznato_u_tekstu' if values else '')
 
 
-def cards(groups,exclude_expired=False):
+def cards(groups,exclude_expired=False,at=None):
     result=[]
     for group in groups:
         ads=group['sources']
-        status,deadline=group_state(ads)
+        status,deadline=group_state(ads,at)
         expired=status=='istekao'
         if exclude_expired and expired:continue
-        best=max(ads,key=lambda a:(deadline_state(a.get('expires',''))=='rok_nije_istekao',not a['expired'],bool(a['employer']),'incomplete' not in a['quality'],len(a['description'])))
+        best=max(ads,key=lambda a:(deadline_state(a.get('expires',''),at)=='rok_nije_istekao',not a['expired'],bool(a['employer']),'incomplete' not in a['quality'],len(a['description'])))
         kind,kind_origin=employment([best]+[a for a in ads if a is not best])
         data=best.get('structured') or {}
         description=' '.join(BeautifulSoup(best['description'],'html.parser').get_text(' ',strip=True).split())
@@ -85,7 +85,7 @@ def cards(groups,exclude_expired=False):
                             'datum_objave':a.get('posted',''),'rok_prijave':a.get('expires',''),
                             'poslednji_pronalazak':a.get('last_seen',''),
                             'poslednje_uspesno_citanje':a.get('fetched_at',''),
-                            'status':deadline_state(a.get('expires',''))} for a in ads])
+                            'status':deadline_state(a.get('expires',''),at)} for a in ads])
         result.append(row)
     return result
 

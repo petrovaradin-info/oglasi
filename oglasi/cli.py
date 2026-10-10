@@ -26,6 +26,7 @@ def main():
     export.add_argument('--archive-only',action='store_true',help='Export only expired groups')
     sub.add_parser('status');sub.add_parser('sources');sub.add_parser('candidates')
     sub.add_parser('deduplicate')
+    review=sub.add_parser('review');review.add_argument('--output',type=Path,default=ROOT/'data'/'oglasi-provera.html')
     report=sub.add_parser('report');report.add_argument('--output',type=Path,default=ROOT/'data'/'oglasi-pregled.html')
     args=parser.parse_args()
     logging.basicConfig(level=logging.INFO,stream=sys.stdout,format='%(asctime)s %(levelname)s %(message)s')
@@ -72,6 +73,15 @@ def main():
                     print(json.dumps(reports,ensure_ascii=False,indent=2))
                     if stop_event.is_set():raise SystemExit(130)
                     if any(r['status']!='ok' for r in reports):raise SystemExit(2)
+        elif args.command=='review':
+            from .review import review_document, render_review
+            from .publication import atomic_text
+            if args.output.suffix.lower()!='.html':parser.error('review output must end in .html')
+            document=review_document(store)
+            atomic_text(args.output.with_suffix('.json'),json.dumps(document,ensure_ascii=False,indent=2))
+            atomic_text(args.output,render_review(document))
+            print(json.dumps(document['counts'],ensure_ascii=False))
+            print(args.output)
         elif args.command=='report':
             from .report import render
             args.output.parent.mkdir(parents=True,exist_ok=True)

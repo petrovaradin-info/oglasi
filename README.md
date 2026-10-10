@@ -167,11 +167,35 @@ ne treba vezivati za ID grupe bez zasebnog mehanizma preusmeravanja.
 Sajt treba da prikazuje tekst kao tekst (ne `innerHTML`), ponudi izbor izvora
 i otvori puni oglas kod oglašivača. Poštovati `vidljiv_do` i ukloniti karticu
 po isteku tog trenutka čak i ako novi snimak kasni. Nepoznat rok nije potvrda
-da konkurs traje. Datumi bez vremena koriste lokalnu vremensku zonu računara;
-računar koji izvozi treba da bude podešen na Europe/Belgrade.
+da konkurs traje. Datumi bez vremena i vremena bez navedenog UTC pomaka koriste izričito
+Europe/Belgrade, nezavisno od vremenske zone računara. Datum bez vremena važi
+do početka sledećeg dana u Beogradu; navedeni UTC pomak se poštuje.
 
 JSON i HTML se pišu u privremeni fajl u istom direktorijumu, pa se tek gotov
 fajl atomskom zamenom objavljuje. Raspoređena PowerShell skripta sada pravi i
 javni izvoz. Lokalni HTML ima zaseban filter „Potrebna provera“.
 
 Provera: `python -m unittest discover -s tests`.
+
+
+## Pregled za proveru (fix/oglasi-008)
+
+```powershell
+.\venv\Scripts\python.exe -m pip install -r requirements.txt
+.\venv\Scripts\python.exe main.py review
+```
+
+Komanda pravi `data/oglasi-provera.html` i `data/oglasi-provera.json`.
+HTML prikazuje izvorne oglase uporedo, njihove datume objave, rokove,
+poslednji pronalazak i pun opis koji se može otvoriti. Tri odeljka obuhvataju:
+postojeća spajanja koja ne prolaze aktuelna pravila; moguće duplikate sa
+različitih izvora; i oglase bez roka koji nisu skoro pronađeni.
+
+Pregled ne menja grupisanje niti podatke oglasa. Kandidati između izvora se
+ponovo ocenjuju aktuelnim pravilima, a parovi čije su obe grupe istekle se
+izostavljaju. Broj parova nije broj jedinstvenih oglasa. Jedna grupa može biti
+u više odeljaka. Sličnost nije verovatnoća da je oglas duplikat.
+
+Pregled je interni alat, nije javni izvoz. Automatski ga osvežava i
+`scripts/run-collector.ps1`. Za sajt i dalje koristiti samo `poslovi-javni.json`.
+Vremenske zone obezbeđuje zavisnost `tzdata`, potrebna i na Windows-u.

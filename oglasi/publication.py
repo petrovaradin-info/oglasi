@@ -19,7 +19,7 @@ def timestamp(value):
 
 def publication_state(ads, at=None):
     at = at or datetime.now(timezone.utc)
-    state, deadline = group_state(ads)
+    state, deadline = group_state(ads, at)
     seen = [t for a in ads if (t := timestamp(a.get('last_seen'))) and t <= at]
     last = max(seen) if seen else None
     reasons = []
@@ -34,13 +34,13 @@ def publication_state(ads, at=None):
             'poslednji_pronalazak': last.isoformat() if last else '',
             'vidljiv_do': until.isoformat() if until else ''}
 
-def public_document(groups):
+def public_document(groups, at=None):
     from .platform_export import cards
-    at = datetime.now(timezone.utc)
+    at = at or datetime.now(timezone.utc)
     visible, review = [], []
     for group in groups:
         policy = publication_state(group['sources'], at)
-        row = cards([group])[0]
+        row = cards([group], at=at)[0]
         row.update(policy)
         if policy['vidljiv'] and row['link'] and row['naslov'].strip():
             visible.append(row)

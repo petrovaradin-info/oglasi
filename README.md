@@ -217,3 +217,24 @@ ni HelloWorld-a, ostaju prethodna pravila. Pravila prepoznavanja duplikata nisu
 olabavljena: jednak naziv pozicije sam po sebi nije dovoljan za spajanje.
 
 Izgled WordPress stranice nije deo ovog projekta i nije menjan u ovoj grani.
+
+
+## Napredak sakupljanja (fix/oglasi-010)
+
+Sakupljanje na svakih 30 sekundi i po završetku izvora ispisuje `NAPREDAK`:
+približan procenat, završene izvore, proteklo vreme, procenjeno preostalo vreme,
+aktivne izvore i broj izvora sa problemom. Primer:
+
+```text
+NAPREDAK ~65% | izvori 18/20 | proteklo 40m | preostalo ~22m | aktivni: oglaszaposao, sljaka | izvori sa problemom: 4
+```
+
+Procena koristi broj stranica i otkrivenih oglasa iz prethodnog pokušaja i
+povećava očekivani obim kada otkrije više sadržaja. Bez istorije koristi početnu
+pretpostavku, pa je procena manje pouzdana. Prvih 30 sekundi piše `racunam...`.
+Procenat može pasti ako se otkriju dodatne stranice. Keš, spor server, čekanje
+mreže i različita brzina izvora utiču na procenu: preostalo vreme nije rok.
+`KRAJ POKUSAJA 100%` znači završetak pokušaja, ne uspeh svih izvora; proveriti
+broj izvora sa problemom i završne statuse. Prekid se označava sa `PREKINUTO`.
+Poruke se nalaze i u konzoli i u postojećem UTF-8 log fajlu. URL logovi ostaju.
+Novi prikaz važi za sledeće pokretanje, ne menja već aktivan Python proces.

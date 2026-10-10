@@ -105,6 +105,21 @@ class Client:
         return html
 
 def collect(store,config,only=None,max_details=None,stop_event=None):
+    from .progress import Progress
+    stop_event=stop_event if stop_event is not None else Event()
+    selected={only} if isinstance(only,str) else set(only or [])
+    sources=[s for s in config['sources'] if not selected or s['id'] in selected]
+    progress=Progress(store,sources)
+    progress.start()
+    failed=True
+    try:
+        result=_collect_impl(store,config,only,max_details,stop_event,progress)
+        failed=False
+        return result
+    finally:progress.finish(failed or stop_event.is_set())
+
+
+def _collect_impl(store,config,only=None,max_details=None,stop_event=None,progress=None):
     stop_event=stop_event if stop_event is not None else Event()
     selected={only} if isinstance(only,str) else set(only or [])
     sources=[s for s in config['sources'] if not selected or s['id'] in selected]
@@ -113,7 +128,7 @@ def collect(store,config,only=None,max_details=None,stop_event=None):
         from .store import Store
         def worker(source):
             local=Store(store.path)
-            try:return collect(local,{**config,'workers':1,'sources':[source]},max_details=max_details,stop_event=stop_event)
+            try:return _collect_impl(local,{**config,'workers':1,'sources':[source]},max_details=max_details,stop_event=stop_event,progress=progress)
             finally:local.close()
         reports=[]
         LOG.info('COLLECT START: sources=%s workers=%s refresh_hours=%s',len(sources),workers,config.get('refresh_hours',24))
@@ -131,9 +146,11 @@ def collect(store,config,only=None,max_details=None,stop_event=None):
         client.source_id=source['id']
         if len(sources)>1:LOG.info('SOURCE %s/%s',source_number,len(sources))
         LOG.info('[%s] SOURCE START',source['id'])
+        progress.update(source['id'])
         started=now(); counts={'pages':0,'discovered':0,'attempted':0,'saved':0,'cached':0,'outside_area':0,'skipped':0,'excluded_cached':0,'errors':[]}
         if not source.get('enabled',True):
-            store.record(source['id'],started,'pending_integration',{'reason':source.get('note','')});continue
+            store.record(source['id'],started,'pending_integration',{'reason':source.get('note','')})
+            progress.update(source['id'],active=False,status='pending_integration');continue
         queue=deque(source['urls']); visited=set(); details=set(); limited=False
         page_limit=source.get('max_pages',config.get('max_pages',100))
         while queue and len(visited)<page_limit and not stop_event.is_set():
@@ -149,7 +166,9 @@ def collect(store,config,only=None,max_details=None,stop_event=None):
                 if not found and not source.get('allow_empty',False) and not empty_listing(html,source):counts['errors'].append({'url':url,'error':'No job links found: empty results or changed/dynamic page; check source'})
                 queue.extend(p for p in pages if p not in visited)
                 LOG.info('[%s] LIST RESULT links=%s pending_pages=%s %s',source['id'],len(found),len(set(queue)-visited),url)
+                progress.update(source['id'],counts['pages']+len(details),counts['pages']+len(details)+len(set(found)-details)+len(set(queue)-visited))
                 for position,link in enumerate(found,1):
+                    progress.update(source['id'],counts['pages']+len(details))
                     if stop_event.is_set():break
                     if link in details:continue
                     details.add(link); counts['discovered']+=1
@@ -214,4 +233,6 @@ def collect(store,config,only=None,max_details=None,stop_event=None):
         store.record(source['id'],started,status,counts)
         LOG.info('%s: %s %s',source['id'],status,counts)
         reports.append({'source':source['id'],'status':status,**counts})
+        progress.update(source['id'],counts['pages']+len(details),active=False,status=status)
+        progress.emit()
     return reports

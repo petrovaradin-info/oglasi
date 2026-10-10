@@ -199,3 +199,21 @@ u više odeljaka. Sličnost nije verovatnoća da je oglas duplikat.
 Pregled je interni alat, nije javni izvoz. Automatski ga osvežava i
 `scripts/run-collector.ps1`. Za sajt i dalje koristiti samo `poslovi-javni.json`.
 Vremenske zone obezbeđuje zavisnost `tzdata`, potrebna i na Windows-u.
+
+
+## Prioritet izvora (fix/oglasi-009)
+
+Za već prepoznat isti oglas važi: Infostud, zatim HelloWorld, zatim ostali.
+Naslov, opis, glavni link i lokacija uzimaju se iz prioritetnog izvora.
+Tip zaposlenja se iz drugih izvora dopunjuje samo ako nedostaje kod glavnog.
+Alternativni linkovi ostaju sačuvani i poređani po prioritetu.
+
+Rok i svežina javne objave određuju se prema najvišem prisutnom prioritetu:
+sekundarni izvor ne može produžiti istekao Infostud oglas niti skloniti aktivan.
+Bez roka važi pravilo poslednjeg pronalaska tokom 14 dana za prioritetni izvor.
+Neusaglašenost sekundarnih kopija ne blokira prioritetnu objavu. Više spornih
+objava samog prioritetnog izvora i dalje zahteva proveru. Ako nema Infostuda
+ni HelloWorld-a, ostaju prethodna pravila. Pravila prepoznavanja duplikata nisu
+olabavljena: jednak naziv pozicije sam po sebi nije dovoljan za spajanje.
+
+Izgled WordPress stranice nije deo ovog projekta i nije menjan u ovoj grani.

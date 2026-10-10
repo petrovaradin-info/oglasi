@@ -1,6 +1,7 @@
 """Deadline state is computed on reads; historical ads are never deleted."""
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
+from .source_priority import authoritative
 
 JOB_TIMEZONE = ZoneInfo("Europe/Belgrade")
 
@@ -25,6 +26,7 @@ def deadline_state(value,at=None):
 
 
 def group_state(ads,at=None):
+    ads=authoritative(ads)
     at=at or datetime.now(timezone.utc)
     known=[a for a in ads if deadline_state(a.get('expires',''),at)!='rok_nije_poznat']
     live=[a for a in known if deadline_state(a['expires'],at)=='rok_nije_istekao']

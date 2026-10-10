@@ -5,6 +5,7 @@ from urllib.parse import urlsplit
 from .model import now
 from .lifecycle import group_state, deadline_instant, deadline_state
 from .platform_export import employment
+from .source_priority import ordered, best_ad, authoritative, PRIORITY
 from .publication import publication_state, timestamp
 
 
@@ -18,8 +19,8 @@ def render(store):
     groups=store.export()
     cards=[]
     for group in sorted(groups,key=lambda g:max(j['posted'] or j['first_seen'] for j in g['sources']),reverse=True):
-        ads=group['sources']
-        best=max(ads,key=lambda j:(not j['expired'],'incomplete' not in j['quality'],len(j['description'])))
+        ads=ordered(group['sources'])
+        best=best_ad(ads)
         state,deadline=group_state(ads)
         policy=publication_state(ads)
         review=not policy['vidljiv'] and state!='istekao'
@@ -28,9 +29,10 @@ def render(store):
         expired=state=='istekao'
         instant=deadline_instant(deadline)
         expiry_ms=int(instant.timestamp()*1000) if instant else 0
-        kind,kind_origin=employment(ads)
+        kind,kind_origin=employment([best]) if best.get('source') in PRIORITY else employment(ads)
+        if not kind:kind,kind_origin=employment(ads)
         posted=best['posted'] or next((j['posted'] for j in ads if j['posted']),'')
-        places=', '.join(sorted({p for j in ads for p in j['locations']}))
+        places=', '.join(sorted({p for j in authoritative(ads) for p in j['locations']}))
         sources=', '.join(sorted({j['source'] for j in ads}))
         links=' · '.join(link(j['url'],j['source'])+' ['+escape(j['expires'] or 'rok nije naveden')+('; rok prošao' if j['expired'] else '')+']'+(' ('+link(j['structured']['original_url'],'original')+')' if j['structured'].get('original_url') and j['structured']['original_url']!=j['url'] else '') for j in ads)
         warning='Izvod sa liste — opis nije kompletan.' if 'incomplete' in best['quality'] else ''

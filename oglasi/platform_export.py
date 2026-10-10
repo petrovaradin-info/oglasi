@@ -4,6 +4,7 @@ import json
 from bs4 import BeautifulSoup
 from urllib.parse import urlsplit
 from .lifecycle import deadline_state, group_state
+from .source_priority import ordered, authoritative, best_ad, PRIORITY
 
 
 FIELDS=('id','naslov','kategorija','poslodavac','lokacija','opis','tip_zaposlenja','tip_zaposlenja_poreklo','plata',
@@ -62,20 +63,21 @@ def employment(ads):
 def cards(groups,exclude_expired=False,at=None):
     result=[]
     for group in groups:
-        ads=group['sources']
+        ads=ordered(group['sources'])
         status,deadline=group_state(ads,at)
         expired=status=='istekao'
         if exclude_expired and expired:continue
-        best=max(ads,key=lambda a:(deadline_state(a.get('expires',''),at)=='rok_nije_istekao',not a['expired'],bool(a['employer']),'incomplete' not in a['quality'],len(a['description'])))
-        kind,kind_origin=employment([best]+[a for a in ads if a is not best])
+        best=best_ad(ads,at)
+        kind,kind_origin=employment([best]) if best.get('source') in PRIORITY else employment(ads)
+        if not kind:kind,kind_origin=employment(ads)
         data=best.get('structured') or {}
         description=' '.join(BeautifulSoup(best['description'],'html.parser').get_text(' ',strip=True).split())
         if len(description)>280:description=description[:277].rsplit(' ',1)[0]+'…'
         row=dict.fromkeys(FIELDS,'')
         row.update(id=str(group['group_id']),naslov=best['title'],kategorija='Posao',
-                   poslodavac=best['employer'],lokacija=', '.join(sorted({p for a in ads for p in a['locations']})),
+                   poslodavac=best['employer'],lokacija=', '.join(sorted({p for a in authoritative(ads) for p in a['locations']})),
                    opis=description,plata=salary(data),tip_zaposlenja=kind,tip_zaposlenja_poreklo=kind_origin,
-                   link=web_url(data.get('original_url')) or web_url(best['url']),
+                   link=(web_url(best['url']) if best.get('source') in PRIORITY else web_url(data.get('original_url'))) or web_url(best['url']),
                    datum_objave=best['posted'] or next((a['posted'] for a in ads if a.get('posted')),''),rok_prijave=deadline,
                    status=status,vidljiv=not expired,arhiviran=expired,
                    poslednji_pronalazak=max((a.get('last_seen','') for a in ads),default=''),

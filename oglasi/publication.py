@@ -6,6 +6,7 @@ from datetime import datetime, timezone, timedelta
 from itertools import combinations
 from pathlib import Path
 from .dedup import match
+from .source_priority import authoritative
 from .lifecycle import group_state, deadline_instant
 
 FRESH_DAYS = 14
@@ -19,6 +20,7 @@ def timestamp(value):
 
 def publication_state(ads, at=None):
     at = at or datetime.now(timezone.utc)
+    ads = authoritative(ads)
     state, deadline = group_state(ads, at)
     seen = [t for a in ads if (t := timestamp(a.get('last_seen'))) and t <= at]
     last = max(seen) if seen else None
